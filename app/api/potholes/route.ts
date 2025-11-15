@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { collection, addDoc, getDocs, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase-config';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export interface ESP32Data {
   deviceId: string;
   timestamp: string;
