@@ -41,16 +41,16 @@ Since your GitHub is connected, Vercel will automatically deploy the latest push
 ## 🧪 **Step 3: Test Production (Once deployed)**
 
 **Your Production URLs:**
-- **Dashboard**: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app
-- **API**: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes
+- **Dashboard**: https://roadeo-silk.vercel.app
+- **API**: https://roadeo-silk.vercel.app/api/potholes
 
 **Test Commands:**
 ```bash
 # Test Firebase API (should return potholes from cloud)
-curl https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes
+curl https://roadeo-silk.vercel.app/api/potholes
 
 # Test ESP32 data submission
-curl -X POST https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes \
+curl -X POST https://roadeo-silk.vercel.app/api/potholes \
   -H "Content-Type: application/json" \
   -d '{"deviceId":"ESP32_PROD","timestamp":"2024-11-16T01:00:00Z","location":{"latitude":12.9716,"longitude":77.5946},"vibrationIntensity":85.2,"accelerometer":{"x":2.1,"y":1.8,"z":9.8}}'
 ```

@@ -13,7 +13,14 @@ export function useRealTimeData() {
   const fetchPotholes = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/potholes');
+      const response = await fetch('/api/potholes', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch potholes');
       
       const data = await response.json();

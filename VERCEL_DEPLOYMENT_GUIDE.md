@@ -66,10 +66,10 @@ Once redeployment completes:
 ### Test the API endpoints:
 ```bash
 # GET potholes from Firebase
-curl https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes
+curl https://roadeo-silk.vercel.app/api/potholes
 
 # POST new pothole data (simulate ESP32)
-curl -X POST https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes \
+curl -X POST https://roadeo-silk.vercel.app/api/potholes \
   -H "Content-Type: application/json" \
   -d '{
     "deviceId": "ESP32_PROD_TEST",
@@ -87,7 +87,7 @@ curl -X POST https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/poth
 
 ## 🔍 Step 4: Verify Firebase Integration
 
-1. **Open production URL**: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app
+1. **Open production URL**: https://roadeo-silk.vercel.app
 2. **Check Firebase Console**: https://console.firebase.google.com/project/roadeo-f55c8/firestore
 3. **Send test data** using ESP32 or curl commands above
 4. **Verify data appears** in both Firebase console and your dashboard
@@ -113,8 +113,8 @@ If deployment fails:
 
 ## 🎯 Production URLs
 
-- **Dashboard**: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app
-- **API Endpoint**: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes
+- **Dashboard**: https://roadeo-silk.vercel.app
+- **API Endpoint**: https://roadeo-silk.vercel.app/api/potholes
 - **Firebase Console**: https://console.firebase.google.com/project/roadeo-f55c8
 
 Once complete, your RoadPulse system will be:

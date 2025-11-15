@@ -26,6 +26,11 @@ export function DashboardContent() {
     isConnected 
   } = useRealTimeData();
   
+  // Clear any stale localStorage data on component mount
+  useEffect(() => {
+    localStorage.removeItem('lastPotholeCount');
+  }, []);
+  
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [newPotholeCount, setNewPotholeCount] = useState<number>(0);
   

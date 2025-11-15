@@ -4,7 +4,7 @@ A real-time pothole detection and monitoring system using ESP32 sensors with a m
 
 ## 🚀 Live Demo
 
-- **Web Dashboard**: [https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app](https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app)
+- **Web Dashboard**: [https://roadeo-silk.vercel.app](https://roadeo-silk.vercel.app)
 - **API Endpoint**: `/api/potholes`
 
 ## 🎯 Project Overview
@@ -254,7 +254,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **GitHub**: [@amanbangeraa](https://github.com/amanbangeraa)
 - **Project Link**: [https://github.com/amanbangeraa/Roadeo](https://github.com/amanbangeraa/Roadeo)
-- **Live Demo**: [https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app](https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app)
+- **Live Demo**: [https://roadeo-silk.vercel.app](https://roadeo-silk.vercel.app)
 
 ---
 

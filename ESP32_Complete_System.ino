@@ -7,7 +7,7 @@
 // === WIFI CONFIG ===
 const char* WIFI_SSID = "Tech_Habba";
 const char* WIFI_PASSWORD = "987654321";
-const char* SERVER_URL = "https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes";
+const char* SERVER_URL = "https://roadeo-silk.vercel.app/api/potholes";
 
 // === PIN SETUP ===
 #define MPU_ADDR 0x68
@@ -408,7 +408,7 @@ void setup() {
   }
 
   ok("RoadPulse system ready for pothole detection!");
-  ok("Dashboard: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app");
+  ok("Dashboard: https://roadeo-silk.vercel.app");
   
   // Show initial status
   dbg("=== INITIAL STATUS ===");
