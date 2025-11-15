@@ -31,7 +31,7 @@ GND   → Common Ground
 Your ESP32 code is already configured with the correct server URL:
 
 **Current Configuration:**
-- **Server URL**: `https://roadeo-ejkm9wkgr-amanbangeraas-projects.vercel.app/api/potholes`
+- **Server URL**: `https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes`
 - **Device ID**: `ESP32-BUS-001`
 - **Alert Threshold**: 80% vibration intensity
 
@@ -57,7 +57,7 @@ ESP32 Sensors → Data Processing → WiFi → API Endpoint → Web Dashboard
 
 1. **Visit Test Endpoint:**
    ```
-   POST https://roadeo-ejkm9wkgr-amanbangeraas-projects.vercel.app/api/test-esp32
+   POST https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes
    ```
 
 2. **Test via Browser Console:**
@@ -86,7 +86,7 @@ ESP32 Sensors → Data Processing → WiFi → API Endpoint → Web Dashboard
 The data automatically appears on your dashboard:
 
 **View Real-time Data:**
-1. Visit: `https://roadeo-ejkm9wkgr-amanbangeraas-projects.vercel.app`
+1. Visit: `https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app`
 2. Check the map for pothole markers
 3. Data refreshes every 30 seconds automatically
 
@@ -172,12 +172,12 @@ The data automatically appears on your dashboard:
 
 **Test API directly:**
 ```bash
-curl -X POST https://roadeo-ejkm9wkgr-amanbangeraas-projects.vercel.app/api/test-esp32
+curl -X POST https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes
 ```
 
 **Check stored data:**
 ```bash
-curl https://roadeo-ejkm9wkgr-amanbangeraas-projects.vercel.app/api/potholes
+curl https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes
 ```
 
 ### 8. Quick Test Setup (Recommended for First Time)
