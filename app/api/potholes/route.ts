@@ -57,7 +57,11 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error processing ESP32 data:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, { status: 500 });
   }
 }
 
@@ -121,8 +125,8 @@ function processESP32Data(data: ESP32Data) {
     sensorData: {
       accelerometer: data.accelerometer,
       vibration: data.vibrationIntensity,
-      sensorData: data.sensorData,
-      batteryLevel: data.batteryLevel,
+      ...(data.sensorData && { sensorData: data.sensorData }),
+      ...(data.batteryLevel !== undefined && { batteryLevel: data.batteryLevel }),
     },
     deviceInfo: {
       model: 'ESP32-DevKit',
