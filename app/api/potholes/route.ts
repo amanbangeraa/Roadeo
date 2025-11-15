@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { collection, addDoc, getDocs, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase-config';
 
 export interface ESP32Data {
   deviceId: string;
@@ -20,9 +22,6 @@ export interface ESP32Data {
   batteryLevel?: number;
 }
 
-// Store potholes in memory (in production, use a database)
-let storedPotholes: any[] = [];
-
 // POST endpoint to receive data from ESP32
 export async function POST(request: NextRequest) {
   try {
@@ -38,19 +37,19 @@ export async function POST(request: NextRequest) {
     // Process and store the data
     const processedPothole = processESP32Data(data);
     
-    // Store in memory (replace with database in production)
-    storedPotholes.unshift(processedPothole);
+    // Store in Firebase Firestore
+    const docRef = await addDoc(collection(db, 'potholes'), {
+      ...processedPothole,
+      timestamp: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
     
-    // Keep only last 100 potholes to prevent memory issues
-    if (storedPotholes.length > 100) {
-      storedPotholes = storedPotholes.slice(0, 100);
-    }
-    
-    console.log('Processed pothole:', processedPothole);
+    console.log('Processed pothole stored in Firebase:', docRef.id);
     
     return NextResponse.json({ 
       success: true, 
-      potholeId: processedPothole.id,
+      potholeId: docRef.id,
       message: 'Pothole data received and processed'
     });
   } catch (error) {
@@ -62,9 +61,26 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve potholes
 export async function GET() {
   try {
+    // Query Firebase Firestore for potholes (latest 100, ordered by creation time)
+    const q = query(
+      collection(db, 'potholes'),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const potholes = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      // Convert Firestore timestamps to ISO strings for JSON serialization
+      timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+      updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
+    }));
+    
     return NextResponse.json({ 
-      potholes: storedPotholes,
-      count: storedPotholes.length 
+      potholes,
+      count: potholes.length 
     });
   } catch (error) {
     console.error('Error fetching potholes:', error);
@@ -76,8 +92,11 @@ function processESP32Data(data: ESP32Data) {
   const severity = calculateSeverity(data.vibrationIntensity);
   
   return {
-    id: `ESP32-${data.deviceId}-${Date.now()}`,
-    timestamp: new Date().toISOString(),
+    deviceId: data.deviceId,
+    location: {
+      latitude: data.location.latitude,
+      longitude: data.location.longitude,
+    },
     gps: {
       latitude: data.location.latitude,
       longitude: data.location.longitude,
@@ -85,7 +104,6 @@ function processESP32Data(data: ESP32Data) {
     },
     vibrationIntensity: data.vibrationIntensity,
     severityLevel: severity,
-    deviceId: data.deviceId,
     vehicleInfo: {
       type: 'Bus',
       owner: 'Public Transport',
@@ -95,14 +113,18 @@ function processESP32Data(data: ESP32Data) {
     assignedTo: null,
     priority: severity === 'high' ? 'Critical' : severity === 'medium' ? 'High' : 'Medium',
     notes: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
     repairedAt: null,
     repairedBy: null,
-    rawSensorData: {
+    sensorData: {
       accelerometer: data.accelerometer,
+      vibration: data.vibrationIntensity,
       sensorData: data.sensorData,
       batteryLevel: data.batteryLevel,
+    },
+    deviceInfo: {
+      model: 'ESP32-DevKit',
+      firmware: '1.0.0',
+      signalStrength: -45,
       originalTimestamp: data.timestamp,
     },
   };

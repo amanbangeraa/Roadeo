@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // For testing purposes - allows read/write to all documents
+    // IMPORTANT: Change this to more restrictive rules in production!
+    match /{document=**} {
+      allow read, write: if true;
+    }
+    
+    /* Production-ready rules (uncomment when you add authentication):
+    
+    // Potholes - Read/Write for authenticated users
+    match /potholes/{potholeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && isValidPotholeData(request.resource.data);
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null && hasRole(['admin']);
+    }
+    
+    // Devices - Read for authenticated users, Write for admins
+    match /devices/{deviceId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && hasRole(['admin', 'operator']);
+    }
+    
+    // Analytics - Read for authenticated users
+    match /analytics/{analyticsId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && hasRole(['admin']);
+    }
+    
+    // Helper functions for production
+    function hasRole(roles) {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+    }
+    
+    function isValidPotholeData(data) {
+      return data.keys().hasAll(['deviceId', 'timestamp', 'location', 'vibrationIntensity']) &&
+        data.vibrationIntensity is number &&
+        data.vibrationIntensity >= 0 &&
+        data.vibrationIntensity <= 100;
+    }
+    
+    */
+  }
+}
