@@ -11,9 +11,10 @@ interface MapViewProps {
   potholes: Pothole[];
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
+  lastUpdateTime?: number;
 }
 
-export function MapView({ potholes, filters, onFilterChange }: MapViewProps) {
+export function MapView({ potholes, filters, onFilterChange, lastUpdateTime }: MapViewProps) {
   const [selectedPothole, setSelectedPothole] = useState<Pothole | null>(null);
   
   const severityColors = {
