@@ -1,6 +1,6 @@
 'use client';
 
-import { type Pothole } from '@/lib/mock-data';
+import { type Pothole } from '@/lib/types';
 import { type FilterState } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { MapPin } from 'lucide-react';

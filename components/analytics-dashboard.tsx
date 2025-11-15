@@ -1,6 +1,6 @@
 'use client';
 
-import { type Pothole, type UserRole } from '@/lib/mock-data';
+import { type Pothole, type UserRole } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { useMemo } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';

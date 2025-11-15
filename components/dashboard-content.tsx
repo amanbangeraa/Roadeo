@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/lib/context';
 import { useNavigation } from '@/lib/navigation-context';
-import { generateMockPotholes, type Pothole } from '@/lib/mock-data';
+import { type Pothole } from '@/lib/types';
 import { useRealTimeData } from '@/lib/use-real-time-data';
 import { type FilterState } from '@/lib/types';
 import { MapView } from './map-view';
@@ -17,20 +17,17 @@ export function DashboardContent() {
   const { user } = useAuth();
   const { currentTab } = useNavigation();
   
-  // Real-time data from ESP32
+  // Real-time data from ESP32 (Firebase backend)
   const { 
-    potholes: realPotholes, 
-    loading: realLoading, 
-    error: realError, 
+    potholes: realTimePotholes, 
+    loading, 
+    error, 
     refreshData,
     isConnected 
   } = useRealTimeData();
   
-  // Mock data for demonstration (can be removed once ESP32 is producing data)
-  const [mockPotholes, setMockPotholes] = useState<Pothole[]>([]);
-  const [newMockPotholes, setNewMockPotholes] = useState<Pothole[]>([]);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
-  const updateIntervalRef = useRef<NodeJS.Timeout>();
+  const [newPotholeCount, setNewPotholeCount] = useState<number>(0);
   
   const [filters, setFilters] = useState<FilterState>({
     severity: 'all',
@@ -40,49 +37,28 @@ export function DashboardContent() {
     searchLocation: '',
   });
 
-  // Initialize mock data
+  // Track new potholes for notifications
   useEffect(() => {
-    setMockPotholes(generateMockPotholes(50));
-  }, []);
+    setLastUpdateTime(Date.now());
+  }, [realTimePotholes.length]);
 
-  // Keep mock updates for demonstration (remove when ESP32 is fully operational)
+  // Monitor for new potholes and show notification
   useEffect(() => {
-    if (user?.role !== 'municipal_agent') return;
-
-    if (updateIntervalRef.current) {
-      clearInterval(updateIntervalRef.current);
+    const previousCount = parseInt(localStorage.getItem('lastPotholeCount') || '0');
+    const currentCount = realTimePotholes.length;
+    
+    if (currentCount > previousCount && previousCount > 0) {
+      setNewPotholeCount(currentCount - previousCount);
+      // Auto-clear notification after 10 seconds
+      setTimeout(() => setNewPotholeCount(0), 10000);
     }
+    
+    localStorage.setItem('lastPotholeCount', currentCount.toString());
+  }, [realTimePotholes.length]);
 
-    updateIntervalRef.current = setInterval(() => {
-      if (Math.random() > 0.8) { // Reduced frequency for demo
-        const newPothole = generateMockPotholes(1)[0];
-        newPothole.id = `PTH-MOCK-${Date.now()}`;
-        
-        setNewMockPotholes(prev => [newPothole, ...prev]);
-        setLastUpdateTime(Date.now());
-        
-        setTimeout(() => {
-          setNewMockPotholes(prev => prev.filter(p => p.id !== newPothole.id));
-          setMockPotholes(current => [newPothole, ...current.slice(0, -1)]);
-        }, 5000);
-      }
-    }, 120000); // Every 2 minutes
-
-    return () => {
-      if (updateIntervalRef.current) {
-        clearInterval(updateIntervalRef.current);
-      }
-    };
-  }, [user?.role]);
-
-  // Combine real and mock data
-  const allPotholes = useMemo(() => {
-    return [...realPotholes, ...mockPotholes, ...newMockPotholes];
-  }, [realPotholes, mockPotholes, newMockPotholes]);
-
-  // Memoized filtering to prevent unnecessary recalculations
+  // Memoized filtering for real-time ESP32 data
   const filteredPotholes = useMemo(() => {
-    return allPotholes.filter((p) => {
+    return realTimePotholes.filter((p) => {
       if (filters.severity !== 'all' && p.severityLevel !== filters.severity) return false;
       if (filters.status !== 'all' && p.status !== filters.status) return false;
       if (filters.deviceId !== 'all' && p.deviceId !== filters.deviceId) return false;
@@ -105,7 +81,7 @@ export function DashboardContent() {
 
       return true;
     });
-  }, [allPotholes, filters, user?.role]);
+  }, [realTimePotholes, filters, user?.role]);
 
   // Memoized callback to prevent unnecessary re-renders
   const handleFilterChange = useCallback((newFilters: FilterState) => {
@@ -118,41 +94,50 @@ export function DashboardContent() {
 
   return (
     <>
-      {/* Connection Status */}
-      <div className="mb-4 p-3 border rounded-lg">
+      {/* Real-time ESP32 Connection Status */}
+      <div className="mb-4 p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <div className="flex items-center space-x-3">
+            <div className={`w-3 h-3 rounded-full animate-pulse ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className="text-sm font-medium">
-              ESP32 Connection: {isConnected ? 'Connected' : 'Disconnected'}
+              🔌 ESP32 Devices: {isConnected ? 'Online & Transmitting' : 'Disconnected'}
             </span>
+            {loading && <div className="text-xs text-blue-600">⟳ Syncing...</div>}
           </div>
-          <div className="text-sm text-gray-600">
-            Real: {realPotholes.length} | Mock: {mockPotholes.length} | Total: {allPotholes.length}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-700 font-medium">
+              🛣️ Live Potholes: <span className="text-blue-600">{realTimePotholes.length}</span>
+            </div>
+            <button 
+              onClick={refreshData}
+              disabled={loading}
+              className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+            >
+              {loading ? '⟳' : '🔄'} Refresh
+            </button>
           </div>
-          <button 
-            onClick={refreshData}
-            className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Refresh
-          </button>
         </div>
-        {realError && (
-          <div className="mt-2 text-sm text-red-600">
-            Error: {realError}
+        {error && (
+          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            ⚠️ Connection Error: {error}
+          </div>
+        )}
+        {realTimePotholes.length === 0 && !loading && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700">
+            📡 No pothole data received yet. Ensure ESP32 devices are connected and detecting road conditions.
           </div>
         )}
       </div>
 
-      {/* Floating notification for new updates */}
-      {user?.role === 'municipal_agent' && (
+      {/* New Pothole Notification */}
+      {newPotholeCount > 0 && (
         <MapUpdateToast
-          newItemsCount={newMockPotholes.length}
+          newItemsCount={newPotholeCount}
           onViewNow={() => {
-            setMockPotholes(current => [...newMockPotholes, ...current]);
-            setNewMockPotholes([]);
+            setNewPotholeCount(0);
+            refreshData(); // Refresh to show latest data
           }}
-          onDismiss={() => setNewMockPotholes([])}
+          onDismiss={() => setNewPotholeCount(0)}
         />
       )}
       
@@ -176,7 +161,7 @@ export function DashboardContent() {
         />
       )}
       {currentTab === 'analytics' && <AnalyticsDashboard potholes={filteredPotholes} role={user.role} />}
-        {user.role === 'municipal_agent' && currentTab === 'alerts' && <AlertsPanel potholes={allPotholes} />}
+        {user.role === 'municipal_agent' && currentTab === 'alerts' && <AlertsPanel potholes={realTimePotholes} />}
         {user.role === 'municipal_agent' && currentTab === 'reports' && <ReportsPanel potholes={filteredPotholes} />}
       </div>
     </>

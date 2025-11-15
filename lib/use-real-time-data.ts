@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { type Pothole } from './mock-data';
+import { type Pothole } from './types';
 
 export function useRealTimeData() {
   const [potholes, setPotholes] = useState<Pothole[]>([]);

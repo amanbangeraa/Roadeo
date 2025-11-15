@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState } from 'react';
-import type { UserRole } from './mock-data';
+import type { UserRole } from './types';
 
 export interface User {
   id: string;

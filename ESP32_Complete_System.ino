@@ -7,7 +7,7 @@
 // === WIFI CONFIG ===
 const char* WIFI_SSID = "Tech_Habba";
 const char* WIFI_PASSWORD = "987654321";
-const char* SERVER_URL = "https://roadeo-b655vh3ve-amanbangeraas-projects.vercel.app/api/potholes";
+const char* SERVER_URL = "https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/esp32";
 
 // === PIN SETUP ===
 #define MPU_ADDR 0x68
@@ -111,6 +111,7 @@ bool checkServerConnection() {
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "ESP32-RoadPulse/1.0");
   http.setTimeout(5000); // 5 second timeout
   
   // Send a simple test request
@@ -141,6 +142,7 @@ void sendToServer(double lat, double lng, float intensity, float ax, float ay, f
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "ESP32-RoadPulse/1.0");
   http.setTimeout(10000); // 10 second timeout
   
   // Create JSON payload
@@ -191,6 +193,7 @@ void sendHeartbeat() {
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "ESP32-RoadPulse/1.0");
   http.setTimeout(5000);
   
   // Create heartbeat payload
@@ -405,7 +408,7 @@ void setup() {
   }
 
   ok("RoadPulse system ready for pothole detection!");
-  ok("Dashboard: https://roadeo-b655vh3ve-amanbangeraas-projects.vercel.app");
+  ok("Dashboard: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app");
   
   // Show initial status
   dbg("=== INITIAL STATUS ===");

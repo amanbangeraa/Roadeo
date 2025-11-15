@@ -1,6 +1,6 @@
 'use client';
 
-import { type Pothole, type UserRole } from '@/lib/mock-data';
+import { type Pothole, type UserRole } from '@/lib/types';
 import { type FilterState } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
