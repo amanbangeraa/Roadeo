@@ -7,7 +7,7 @@
 // === WIFI CONFIG ===
 const char* WIFI_SSID = "Tech_Habba";
 const char* WIFI_PASSWORD = "987654321";
-const char* SERVER_URL = "https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes";
+const char* SERVER_URL = "https://roadeo-b655vh3ve-amanbangeraas-projects.vercel.app/api/potholes";
 
 // === PIN SETUP ===
 #define MPU_ADDR 0x68
@@ -34,6 +34,12 @@ String PHONE = "+911234567890";
 // === WIFI STATUS ===
 bool wifiConnected = false;
 unsigned long lastWiFiCheck = 0;
+
+// === SERVER STATUS ===
+bool serverConnected = false;
+unsigned long lastServerCheck = 0;
+unsigned long lastSuccessfulPost = 0;
+unsigned long lastHeartbeat = 0;
 
 // === GPS STATUS ===
 bool gpsReady = false;
@@ -94,17 +100,48 @@ void checkWiFi() {
 }
 
 // =======================================================
+//        CHECK SERVER CONNECTION
+// =======================================================
+bool checkServerConnection() {
+  if (!wifiConnected || WiFi.status() != WL_CONNECTED) {
+    serverConnected = false;
+    return false;
+  }
+
+  HTTPClient http;
+  http.begin(SERVER_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(5000); // 5 second timeout
+  
+  // Send a simple test request
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode == 200 || httpResponseCode == 405) { // 405 = Method Not Allowed (expected for GET on POST endpoint)
+    serverConnected = true;
+    ok("Server connection verified");
+  } else {
+    serverConnected = false;
+    err("Server unreachable. HTTP Code: " + String(httpResponseCode));
+  }
+  
+  http.end();
+  return serverConnected;
+}
+
+// =======================================================
 //        SEND DATA TO SERVER
 // =======================================================
 void sendToServer(double lat, double lng, float intensity, float ax, float ay, float az, int mpuIntensity, int sw420Intensity) {
   if (!wifiConnected || WiFi.status() != WL_CONNECTED) {
     err("No WiFi connection. Cannot send to server.");
+    serverConnected = false;
     return;
   }
 
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
+  http.setTimeout(10000); // 10 second timeout
   
   // Create JSON payload
   DynamicJsonDocument doc(1024);
@@ -127,14 +164,68 @@ void sendToServer(double lat, double lng, float intensity, float ax, float ay, f
   
   int httpResponseCode = http.POST(jsonString);
   
-  if (httpResponseCode > 0) {
+  if (httpResponseCode == 200) {
     String response = http.getString();
-    ok("Server Response (" + String(httpResponseCode) + "): " + response);
+    ok("✅ Server Response (" + String(httpResponseCode) + "): " + response);
+    serverConnected = true;
+    lastSuccessfulPost = millis();
+  } else if (httpResponseCode > 0) {
+    err("❌ Server Error (" + String(httpResponseCode) + "): " + http.getString());
+    serverConnected = false;
   } else {
-    err("HTTP Error: " + String(httpResponseCode));
+    err("❌ Connection Failed. HTTP Error: " + String(httpResponseCode));
+    serverConnected = false;
   }
   
   http.end();
+}
+
+// =======================================================
+//        SEND HEARTBEAT TO SERVER
+// =======================================================
+void sendHeartbeat() {
+  if (!wifiConnected || WiFi.status() != WL_CONNECTED) {
+    return; // Skip heartbeat if no WiFi
+  }
+
+  HTTPClient http;
+  http.begin(SERVER_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(5000);
+  
+  // Create heartbeat payload
+  DynamicJsonDocument doc(512);
+  doc["deviceId"] = DEVICE_ID;
+  doc["timestamp"] = String(millis());
+  doc["heartbeat"] = true;
+  doc["status"]["wifi"] = wifiConnected;
+  doc["status"]["gps"] = gpsReady;
+  doc["status"]["satellites"] = gps.satellites.value();
+  doc["location"]["latitude"] = gpsReady ? gps.location.lat() : 19.0760;
+  doc["location"]["longitude"] = gpsReady ? gps.location.lng() : 72.8777;
+  doc["vibrationIntensity"] = 0; // Minimal intensity for heartbeat
+  doc["accelerometer"]["x"] = 0;
+  doc["accelerometer"]["y"] = 0;
+  doc["accelerometer"]["z"] = 0;
+  
+  String jsonString;
+  serializeJson(doc, jsonString);
+  
+  dbg("Sending heartbeat...");
+  
+  int httpResponseCode = http.POST(jsonString);
+  
+  if (httpResponseCode == 200) {
+    dbg("💓 Heartbeat sent successfully");
+    serverConnected = true;
+    lastSuccessfulPost = millis();
+  } else {
+    dbg("💔 Heartbeat failed: " + String(httpResponseCode));
+    serverConnected = false;
+  }
+  
+  http.end();
+  lastHeartbeat = millis();
 }
 
 // =======================================================
@@ -305,8 +396,23 @@ void setup() {
     dbg("Note: GPS may take 1-5 minutes for initial lock outdoors");
   }
 
+  // Test server connection
+  dbg("Testing server connection...");
+  if (checkServerConnection()) {
+    ok("✅ Server connection successful!");
+  } else {
+    err("❌ Server connection failed!");
+  }
+
   ok("RoadPulse system ready for pothole detection!");
-  ok("Dashboard: https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app");
+  ok("Dashboard: https://roadeo-b655vh3ve-amanbangeraas-projects.vercel.app");
+  
+  // Show initial status
+  dbg("=== INITIAL STATUS ===");
+  dbg("📡 WiFi: " + String(wifiConnected ? "CONNECTED" : "DISCONNECTED"));
+  dbg("☁️  Server: " + String(serverConnected ? "ONLINE" : "OFFLINE"));
+  dbg("🛰️  GPS: " + String(gpsReady ? "READY" : "WAITING"));
+  dbg("🔧 Device ID: " + DEVICE_ID);
   
   delay(1000);
 }
@@ -358,12 +464,35 @@ void loop() {
   float combinedIntensity = (MPU_WEIGHT * mpuIntensity) + (SW420_WEIGHT * sw420Intensity);
   combinedIntensity = constrain(combinedIntensity, 0, 100);
 
+  // Check server connection every 30 seconds
+  if (millis() - lastServerCheck > 30000) {
+    dbg("Checking server connection...");
+    checkServerConnection();
+    lastServerCheck = millis();
+  }
+
+  // Send heartbeat every 60 seconds to show device is online
+  if (millis() - lastHeartbeat > 60000) {
+    sendHeartbeat();
+  }
+
   // Debug output every 5 seconds
   static unsigned long lastDebug = 0;
   if (millis() - lastDebug > 5000) {
-    dbg("Sensors - MPU: " + String(mpuIntensity) + "% | SW420: " + String(sw420Intensity) + "% | Combined: " + String(combinedIntensity, 1) + "%");
-    dbg("GPS Status: " + String(gps.satellites.value()) + " sats, " + (gpsReady ? "READY" : "WAITING"));
-    dbg("Accelerometer: X=" + String(ax, 2) + " Y=" + String(ay, 2) + " Z=" + String(az, 2));
+    dbg("=== SYSTEM STATUS ===");
+    dbg("📡 WiFi: " + String(wifiConnected ? "CONNECTED" : "DISCONNECTED"));
+    dbg("☁️  Server: " + String(serverConnected ? "ONLINE" : "OFFLINE"));
+    dbg("🛰️  GPS: " + String(gps.satellites.value()) + " sats, " + (gpsReady ? "READY" : "WAITING"));
+    dbg("📊 Sensors - MPU: " + String(mpuIntensity) + "% | SW420: " + String(sw420Intensity) + "% | Combined: " + String(combinedIntensity, 1) + "%");
+    dbg("📈 Accelerometer: X=" + String(ax, 2) + " Y=" + String(ay, 2) + " Z=" + String(az, 2));
+    
+    if (lastSuccessfulPost > 0) {
+      unsigned long timeSinceLastPost = (millis() - lastSuccessfulPost) / 1000;
+      dbg("⏱️  Last successful post: " + String(timeSinceLastPost) + "s ago");
+    } else {
+      dbg("⚠️  No successful posts yet");
+    }
+    
     lastDebug = millis();
   }
 
