@@ -246,9 +246,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Team
 
-- **Hardware Development** - ESP32 sensor integration
-- **Software Development** - Web dashboard and API
-- **Testing & Validation** - Real-world deployment testing
+- **Adithya**
+- **Dhanush G.**
 
 ## 📞 Contact
 
