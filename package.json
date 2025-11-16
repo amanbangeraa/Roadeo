@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:webhook": "node scripts/test-webhook.js",
+    "test:webhook:health": "node scripts/test-webhook.js health",
+    "test:webhook:pothole": "node scripts/test-webhook.js pothole"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.0.2",

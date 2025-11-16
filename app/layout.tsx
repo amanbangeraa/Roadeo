@@ -4,6 +4,11 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { AuthProvider } from '@/lib/context'
 import { ThemeProvider } from '@/lib/theme-context'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { ClientErrorHandler } from '@/components/client-error-handler'
+
+// Import environment validation (will run on client side automatically)
+import '@/lib/env-validation'
 
 const _inter = Inter({ subsets: ["latin"] });
 const _jetbrainsMono = JetBrains_Mono({ subsets: ["latin"] });
@@ -39,11 +44,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <ThemeProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-        </ThemeProvider>
+        <ClientErrorHandler />
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
         <Analytics />
       </body>
     </html>

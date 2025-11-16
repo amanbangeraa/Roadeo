@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 
+// Force this route to be dynamic (not statically generated)
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 

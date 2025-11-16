@@ -18,12 +18,21 @@ import {
 import { db } from './firebase-config';
 import { PotholeDocument, DeviceDocument, UserDocument } from './firebase-schema';
 
+// Check if Firebase is properly initialized
+function ensureFirebaseInitialized() {
+  if (!db) {
+    console.warn('Firebase not initialized - some features may not work properly');
+    throw new Error('Firebase is not properly configured. Please check your environment variables.');
+  }
+}
+
 // ===== POTHOLE OPERATIONS =====
 
 export const potholeService = {
   // Add new pothole from ESP32
   async createPothole(data: Omit<PotholeDocument, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
+      ensureFirebaseInitialized();
       const docRef = await addDoc(collection(db, 'potholes'), {
         ...data,
         createdAt: serverTimestamp(),
@@ -305,3 +314,87 @@ export const notificationService = {
     }
   }
 };
+
+// ===== SIMPLIFIED API FOR WEBHOOK USAGE =====
+
+/**
+ * Add pothole record from SMS/webhook data
+ * This function handles data from various sources including SMS
+ */
+export async function addPotholeRecord(data: {
+  deviceId: string;
+  timestamp: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  vibrationIntensity: number;
+  source?: string;
+  satellites?: number;
+  processedAt?: string;
+  rawSMS?: string;
+  accelerometer?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  sensorData?: {
+    mpuIntensity: number;
+    sw420Intensity: number;
+  };
+}) {
+  try {
+    // Determine severity level based on vibration intensity
+    let severityLevel: 'low' | 'medium' | 'high' = 'low';
+    if (data.vibrationIntensity >= 80) {
+      severityLevel = 'high';
+    } else if (data.vibrationIntensity >= 50) {
+      severityLevel = 'medium';
+    }
+
+    // Create the document structure
+    const potholeDoc = {
+      deviceId: data.deviceId,
+      timestamp: serverTimestamp(), // Use server timestamp for consistency
+      location: new GeoPoint(data.location.latitude, data.location.longitude),
+      vibrationIntensity: data.vibrationIntensity,
+      severityLevel,
+      status: 'reported' as const,
+      source: data.source || 'SMS',
+      metadata: {
+        satellites: data.satellites || 0,
+        processedAt: data.processedAt || new Date().toISOString(),
+        rawData: data.rawSMS || '',
+        accelerometer: data.accelerometer || null,
+        sensorData: data.sensorData || null,
+      },
+      alerts: {
+        smsAlert: true,
+        webAlert: data.source !== 'SMS',
+        notificationSent: false,
+      },
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const docRef = await addDoc(collection(db, 'potholes'), potholeDoc);
+    
+    console.log('✅ Pothole record created:', {
+      id: docRef.id,
+      deviceId: data.deviceId,
+      intensity: data.vibrationIntensity,
+      source: data.source
+    });
+
+    // Update device heartbeat with location
+    await deviceService.updateDeviceHeartbeat(data.deviceId, {
+      latitude: data.location.latitude,
+      longitude: data.location.longitude
+    });
+
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Error adding pothole record:', error);
+    throw error;
+  }
+}

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, addDoc, getDocs, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase-config';
+import { potholeService, addPotholeRecord } from '@/lib/firebase-service';
 
+// Force this route to be dynamic (not statically generated)
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 
 export interface ESP32Data {
   deviceId: string;
@@ -13,7 +12,7 @@ export interface ESP32Data {
     longitude: number;
   };
   vibrationIntensity: number;
-  accelerometer: {
+  accelerometer?: {
     x: number;
     y: number;
     z: number;
@@ -25,120 +24,125 @@ export interface ESP32Data {
   batteryLevel?: number;
 }
 
-// POST endpoint to receive data from ESP32
+// POST endpoint to receive data from ESP32 (backup method - primary is SMS via Twilio)
 export async function POST(request: NextRequest) {
   try {
     const data: ESP32Data = await request.json();
     
-    console.log('Received ESP32 data:', data);
+    console.log('📥 Received ESP32 data via HTTP:', data);
     
     // Validate ESP32 data
     if (!data.deviceId || data.vibrationIntensity === undefined || !data.location) {
       return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
     }
 
-    // Process and store the data
-    const processedPothole = processESP32Data(data);
+    // Prepare data for Firebase storage
+    const potholeData = {
+      deviceId: data.deviceId,
+      timestamp: new Date().toISOString(),
+      location: {
+        latitude: data.location.latitude,
+        longitude: data.location.longitude
+      },
+      vibrationIntensity: data.vibrationIntensity,
+      source: 'HTTP',
+      accelerometer: data.accelerometer,
+      sensorData: data.sensorData,
+      batteryLevel: data.batteryLevel,
+      processedAt: new Date().toISOString()
+    };
+
+    // Store in Firebase using our existing service
+    const potholeId = await addPotholeRecord(potholeData);
     
-    // Store in Firebase Firestore
-    const docRef = await addDoc(collection(db, 'potholes'), {
-      ...processedPothole,
-      timestamp: Timestamp.now(),
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
-    
-    console.log('Processed pothole stored in Firebase:', docRef.id);
+    console.log('✅ ESP32 pothole stored in Firebase:', potholeId);
     
     return NextResponse.json({ 
       success: true, 
-      potholeId: docRef.id,
-      message: 'Pothole data received and processed'
+      potholeId,
+      message: 'Pothole data received and stored in Firebase'
     });
   } catch (error) {
-    console.error('Error processing ESP32 data:', error);
+    console.error('❌ Error processing ESP32 data:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
 
-// GET endpoint to retrieve potholes
-export async function GET() {
+// GET endpoint to retrieve potholes from Firebase
+export async function GET(request: NextRequest) {
   try {
-    // Query Firebase Firestore for potholes (latest 100, ordered by creation time)
-    const q = query(
-      collection(db, 'potholes'),
-      orderBy('createdAt', 'desc'),
-      limit(100)
-    );
+    console.log('📥 Fetching potholes from Firebase...');
     
-    const querySnapshot = await getDocs(q);
-    const potholes = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      // Convert Firestore timestamps to ISO strings for JSON serialization
-      timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-      updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
+    // Get query parameters for filtering
+    const { searchParams } = new URL(request.url);
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50;
+    const deviceId = searchParams.get('deviceId') || undefined;
+    const severityLevel = searchParams.get('severity') as 'low' | 'medium' | 'high' | undefined;
+    const status = searchParams.get('status') || undefined;
+
+    // Build filter object
+    const filters: any = { limit };
+    if (deviceId && deviceId !== 'all') filters.deviceId = deviceId;
+    if (severityLevel) filters.severityLevel = severityLevel;
+    if (status && status !== 'all') filters.status = status;
+
+    // Fetch potholes from Firebase
+    const potholes = await potholeService.getPotholes(filters);
+
+    console.log(`✅ Retrieved ${potholes.length} potholes from Firebase`);
+
+    // Convert Firebase data to expected frontend format
+    const formattedPotholes = potholes.map(pothole => ({
+      id: pothole.id,
+      deviceId: pothole.deviceId,
+      timestamp: pothole.timestamp instanceof Date ? pothole.timestamp.toISOString() : 
+                 (pothole.timestamp as any)?.toDate?.() ? 
+                 (pothole.timestamp as any).toDate().toISOString() : pothole.timestamp,
+      gps: {
+        latitude: pothole.location.latitude,
+        longitude: pothole.location.longitude,
+        address: `Lat: ${pothole.location.latitude.toFixed(6)}, Lng: ${pothole.location.longitude.toFixed(6)}`
+      },
+      vibrationIntensity: pothole.vibrationIntensity,
+      severityLevel: pothole.severityLevel,
+      status: pothole.status,
+      vehicleInfo: {
+        type: 'ESP32 Device',
+        owner: 'Municipal Transport',
+        registrationNumber: pothole.deviceId
+      },
+      assignedTo: null,
+      priority: pothole.severityLevel,
+      notes: [],
+      createdAt: pothole.createdAt instanceof Date ? pothole.createdAt.toISOString() : 
+                 (pothole.createdAt as any)?.toDate?.() ? 
+                 (pothole.createdAt as any).toDate().toISOString() : pothole.createdAt,
+      updatedAt: pothole.updatedAt instanceof Date ? pothole.updatedAt.toISOString() : 
+                 (pothole.updatedAt as any)?.toDate?.() ? 
+                 (pothole.updatedAt as any).toDate().toISOString() : pothole.updatedAt,
+      repairedAt: null,
+      repairedBy: null
     }));
-    
+
     return NextResponse.json({ 
-      potholes,
-      count: potholes.length 
+      potholes: formattedPotholes,
+      count: formattedPotholes.length,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error fetching potholes:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('❌ Error fetching potholes from Firebase:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      potholes: [],
+      count: 0
+    }, { status: 500 });
   }
 }
 
-function processESP32Data(data: ESP32Data) {
-  const severity = calculateSeverity(data.vibrationIntensity);
-  
-  return {
-    deviceId: data.deviceId,
-    location: {
-      latitude: data.location.latitude,
-      longitude: data.location.longitude,
-    },
-    gps: {
-      latitude: data.location.latitude,
-      longitude: data.location.longitude,
-      address: `Lat: ${data.location.latitude.toFixed(6)}, Lng: ${data.location.longitude.toFixed(6)}`,
-    },
-    vibrationIntensity: data.vibrationIntensity,
-    severityLevel: severity,
-    vehicleInfo: {
-      type: 'Bus',
-      owner: 'Public Transport',
-      registrationNumber: data.deviceId,
-    },
-    status: 'reported' as const,
-    assignedTo: null,
-    priority: severity === 'high' ? 'Critical' : severity === 'medium' ? 'High' : 'Medium',
-    notes: [],
-    repairedAt: null,
-    repairedBy: null,
-    sensorData: {
-      accelerometer: data.accelerometer,
-      vibration: data.vibrationIntensity,
-      ...(data.sensorData && { sensorData: data.sensorData }),
-      ...(data.batteryLevel !== undefined && { batteryLevel: data.batteryLevel }),
-    },
-    deviceInfo: {
-      model: 'ESP32-DevKit',
-      firmware: '1.0.0',
-      signalStrength: -45,
-      originalTimestamp: data.timestamp,
-    },
-  };
-}
-
-function calculateSeverity(vibrationIntensity: number): 'low' | 'medium' | 'high' {
-  if (vibrationIntensity > 85) return 'high';
-  if (vibrationIntensity > 65) return 'medium';
-  return 'low';
-}
+// Note: This endpoint serves as a backup to the SMS/Twilio webhook method
+// Primary data flow: ESP32 → SMS → Twilio → /api/twilio-webhook → Firebase
+// Secondary data flow: ESP32 → HTTP → /api/potholes → Firebase

@@ -12,20 +12,34 @@ import { Button } from '@/components/ui/button';
 
 export function DashboardLayout() {
   const { isAuthenticated } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Start with false to prevent hydration mismatch
+  const [isMobile, setIsMobile] = useState(true); // Start with true to be safe
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+    
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (!mobile) setSidebarOpen(true);
+      if (!mobile && !sidebarOpen) setSidebarOpen(true);
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [sidebarOpen]);
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="flex h-screen bg-background">
+        <div className="flex items-center justify-center w-full">
+          <div className="animate-pulse">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginPage />;

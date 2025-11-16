@@ -7,7 +7,7 @@
 // === WIFI CONFIG ===
 const char* WIFI_SSID = "Tech_Habba";
 const char* WIFI_PASSWORD = "987654321";
-const char* SERVER_URL = "https://roadeo-mj41o7x2z-amanbangeraas-projects.vercel.app/api/potholes";
+const char* SERVER_URL = "https://roadeo-git-master-amanbangeraas-projects.vercel.app/api/potholes";
 
 // === PIN SETUP ===
 #define MPU_ADDR 0x68
@@ -28,8 +28,8 @@ TinyGPSPlus gps;
 float prevAx = 0, prevAy = 0, prevAz = 0;
 String DEVICE_ID = "ESP32-BUS-001"; // Unique identifier for this device
 
-// === PHONE NUMBER ===
-String PHONE = "+911234567890";
+// === TWILIO PHONE NUMBER ===
+String TWILIO_PHONE = "+16063570667 "; // Your Twilio virtual phone number
 
 // === WIFI STATUS ===
 bool wifiConnected = false;
@@ -232,18 +232,20 @@ void sendHeartbeat() {
 }
 
 // =======================================================
-//        SMS SENDER
+//        SMS SENDER - STRUCTURED FORMAT FOR TWILIO
 // =======================================================
 void sendSMS(double lat, double lng, float intensity) {
-  String msg = "POTHOLE DETECTED!\n";
-  msg += "Device: " + DEVICE_ID + "\n";
-  msg += "Intensity: " + String(intensity,1) + "%\n";
-  msg += "Lat: " + String(lat,6) + "\n";
-  msg += "Lng: " + String(lng,6) + "\n";
-  msg += "Time: " + String(millis()/1000) + "s\n";
-  msg += "Maps: https://maps.google.com/?q=" + String(lat,6) + "," + String(lng,6);
+  // Create structured data format for easy parsing
+  String msg = "ROADPULSE|";
+  msg += "DEV:" + DEVICE_ID + "|";
+  msg += "LAT:" + String(lat,6) + "|";
+  msg += "LNG:" + String(lng,6) + "|";
+  msg += "INT:" + String(intensity,1) + "|";
+  msg += "TIME:" + String(millis()) + "|";
+  msg += "SATS:" + String(gps.satellites.value()) + "|";
+  msg += "TYPE:POTHOLE";
 
-  dbg("Sending SMS alert...");
+  dbg("Sending structured SMS to Twilio: " + msg);
 
   gsmSerial.println("AT");
   delay(300);
@@ -254,7 +256,7 @@ void sendSMS(double lat, double lng, float intensity) {
   dbg("CMGF Response: " + gsmSerial.readString());
 
   gsmSerial.print("AT+CMGS=\"");
-  gsmSerial.print(PHONE);
+  gsmSerial.print(TWILIO_PHONE);
   gsmSerial.println("\"");
   delay(500);
 
@@ -262,7 +264,39 @@ void sendSMS(double lat, double lng, float intensity) {
   gsmSerial.write(26); // CTRL+Z
   delay(2000);
 
-  ok("SMS alert sent to " + PHONE);
+  ok("Structured SMS sent to Twilio: " + TWILIO_PHONE);
+}
+
+// =======================================================
+//        SMS HEARTBEAT - FOR DEVICE STATUS
+// =======================================================
+void sendHeartbeatSMS() {
+  String msg = "ROADPULSE|";
+  msg += "DEV:" + DEVICE_ID + "|";
+  msg += "LAT:" + String(gpsReady ? gps.location.lat() : 19.0760, 6) + "|";
+  msg += "LNG:" + String(gpsReady ? gps.location.lng() : 72.8777, 6) + "|";
+  msg += "INT:0|";
+  msg += "TIME:" + String(millis()) + "|";
+  msg += "SATS:" + String(gps.satellites.value()) + "|";
+  msg += "TYPE:HEARTBEAT";
+
+  dbg("Sending heartbeat SMS to Twilio...");
+
+  gsmSerial.println("AT");
+  delay(300);
+  gsmSerial.println("AT+CMGF=1");
+  delay(300);
+
+  gsmSerial.print("AT+CMGS=\"");
+  gsmSerial.print(TWILIO_PHONE);
+  gsmSerial.println("\"");
+  delay(500);
+
+  gsmSerial.print(msg);
+  gsmSerial.write(26); // CTRL+Z
+  delay(2000);
+
+  ok("Heartbeat SMS sent to Twilio");
 }
 
 // =======================================================
@@ -474,9 +508,15 @@ void loop() {
     lastServerCheck = millis();
   }
 
-  // Send heartbeat every 60 seconds to show device is online
-  if (millis() - lastHeartbeat > 60000) {
-    sendHeartbeat();
+  // Send heartbeat every 5 minutes (300 seconds) via SMS
+  if (millis() - lastHeartbeat > 300000) {
+    sendHeartbeatSMS();
+    lastHeartbeat = millis();
+    
+    // Also try web heartbeat if WiFi available
+    if (wifiConnected && serverConnected) {
+      sendHeartbeat();
+    }
   }
 
   // Debug output every 5 seconds
@@ -519,13 +559,15 @@ void loop() {
       currentLng = 72.8777 + (random(-50, 50) / 10000.0);
     }
 
-    // Send data to web server (primary method)
-    ok("Sending data to dashboard...");
-    sendToServer(currentLat, currentLng, combinedIntensity, ax, ay, az, mpuIntensity, sw420Intensity);
-
-    // Send SMS alert (backup notification)
-    ok("Sending SMS alert...");
+    // Send SMS data to Twilio (primary method)
+    ok("Sending data via SMS to Twilio...");
     sendSMS(currentLat, currentLng, combinedIntensity);
+
+    // Try web server as backup if WiFi is available
+    if (wifiConnected && serverConnected) {
+      ok("Sending backup data to dashboard...");
+      sendToServer(currentLat, currentLng, combinedIntensity, ax, ay, az, mpuIntensity, sw420Intensity);
+    }
 
     // Prevent duplicate detections
     delay(5000);
